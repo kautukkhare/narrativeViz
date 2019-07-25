@@ -1,4 +1,4 @@
-﻿Country Code,Short Name,Region,﻿RecordYear,GDPPerCapita,GDPperCapitaPPP,Homicide,HomicideFemale,HomicideFemale,Population
+﻿Country Code,Short Name,Region,year,GDPPerCapita,GDPperCapitaPPP,Homicide,HomicideFemale,HomicideFemale,Population
 ABW,Aruba,Latin America & Caribbean,1995,"26,705","39,113",,,,"80,324"
 AFG,Afghanistan,South Asia,1995,,,,,,"17,099,541"
 AGO,Angola,Sub-Saharan Africa,1995,"1,879","3,331",,,,"14,268,994"
