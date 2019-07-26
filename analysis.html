@@ -2,23 +2,44 @@
 
 <head>
 <style type="text/css">
-	text { fill: black; text-anchor: middle; }
-	line { stroke-width: 1; stroke: lightgray; }
-	circle {stroke: black;}
-	rect {cursor: pointer;fill:lightblue;stroke:black;}
+	.chart text { fill: black; text-anchor: middle; }
+	.chart line { stroke-width: 1; stroke: lightgray; }
+	.chart circle {stroke: white; cursor: pointer;}
+	.chart circle:hover {stroke: black;}
+	.chart rect {cursor: pointer;fill:lightblue;stroke:black;}
+	#tooltip {
+	    opacity: 0;
+	    position: absolute;
+	    text-align: left;
+	    /*width: 60px; height: 40px;*/
+	    background: white;
+	    stroke: black;
+	    border: 5px solid black;
+	}
+	
 </style>
 </head>
 
 <body onload='init()'>
-	<svg width=1200 height=610></svg>
-	<div class="status">Click on an year</div>
-
+		<h2> Choose one or more region </h2>
+		<div class="multiselect">
+			<input type="checkbox" id="Latin America & Caribbean" checked> Latin America & Caribbean
+			<input type="checkbox" id="South Asia" checked>South Asia
+			<input type="checkbox" id="Sub-Saharan Africa" checked>Sub-Saharan Africa
+			<input type="checkbox" id="Europe & Central Asia" checked>Europe & Central Asia
+			<input type="checkbox" id="Middle East & North Africa" checked>Middle East & North Africa
+			<input type="checkbox" id="East Asia & Pacific" checked>East Asia & Pacific
+			<input type="checkbox" id="North America" checked>North America
+		</div>
+		<svg class="chart" width=1200 height=610></svg>
+		<div class="status">Click on an year</div>
+		<div id="tooltip"></div>
 
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script>
-function getFilteredData(data, year){
+function getFilteredData(data, year, region){
 		var filteredData = data.filter(function (el) {
-			return el.year == year; 
+			return el.year == year && region.includes(el.Region); 
 		});
 		return filteredData;
 }
@@ -27,22 +48,27 @@ async function init() {
 	const data = await d3.csv("https://raw.githubusercontent.com/kautukkhare/narrativeViz/master/GDPAndHomicideData.csv");
 
 	//var obj = {"Country Code":"ABW","Short Name":"Aruba","Region":"Latin America & Caribbean","year":"1995","GDPPerCapita":"26,705","GDPperCapitaPPP":"39,113","Homicide":"","HomicideFemale":"","Population":"80,324"};
-	var obj = data[0];
-	
-	var jsonObj = JSON.parse(JSON.stringify(obj));
-	console.log(obj);
-	console.log(jsonObj);
-	console.log(obj.year);
-	console.log(jsonObj["Short Name"]);
-	console.log(jsonObj["Region"]);
-	console.log(jsonObj["year"]);
 	
 	//get the years as an array
 	const years = [...new Set(data.map(eachData => eachData.year))]
 	const regions = [...new Set(data.map(eachData => eachData.Region))]
 
-	console.log(years);
-	
+	var selectedYear = years[0];
+
+	function getRegionsList() {
+		var checkBoxList = document.getElementsByTagName("input");;
+		var regionList = [];
+		var i;
+		for (i = 0; i < checkBoxList.length; i++) {
+  			if (checkBoxList[i].checked) {
+    			regionList.push(checkBoxList[i].id);
+  			}
+		}
+		return regionList;
+	}
+
+	var regionList = getRegionsList();
+	console.log(regionList);
 
 	//Define Scales
 	var xlogScale = d3.scaleLinear()
@@ -53,14 +79,14 @@ async function init() {
 	.domain([0, 150])
 	.range([500, 0]);
 
-	var rScale = d3.scaleLog()
-    .base(Math.E)
+
+    var rScale = d3.scaleLinear()
     .domain([9230,1386395000])
-    .range([0.01,50]);
+    .range([10,70]);
 
     var colorScale = d3.scaleOrdinal()
-          .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2"])
-          .domain(regions);
+          .domain(regions)
+          .range(d3.schemeSet2);
 
 	var rectWidth = 50;
 	var rectHeight = 25;
@@ -100,9 +126,10 @@ async function init() {
 	.attr('height',rectHeight)
 	//.attr('class', "yearsBar")
 	.on('click', function(d, i) {
+		selectedYear = d;
 		d3.select('.status')
 		.text('You clicked on year ' + d);
-		plotGraph(scatterPlot,getFilteredData(data,d));
+		plotGraph(scatterPlot,getFilteredData(data,d, getRegionsList()));
 	  });
 	
 	yearsBarSVG.selectAll('text')
@@ -116,13 +143,14 @@ async function init() {
 	.attr('style',"cursor: pointer")
 	.text(function(d){return d})
 	.on('click', function(d, i) {
+		selectedYear = d;
 		d3.select('.status')
 		.text('You clicked on year ' + d);
-		plotGraph(scatterPlot,getFilteredData(data,d));
-	  });;
+		plotGraph(scatterPlot,getFilteredData(data,d, getRegionsList()));
+	  });
 
-
-	
+	// Adding Tooltip functions
+	var tooltip = d3.select("#tooltip");
 
 	//Define plotting function
 	function plotGraph(element, d){
@@ -134,14 +162,30 @@ async function init() {
 			.attr("cx", function(d,i) {return xlogScale(parseFloat(d.GDPPerCapita.replace(/,/g, '')));})
 			.attr("cy", function(d,i) {return ylogScale(d.Homicide);})
 			.attr("r", function(d,i) {return rScale(parseFloat(d.Population.replace(/,/g, '')));})
-			.style("fill", function(d){ return colorScale(d.Region); });
+			.style("fill", function(d){ return colorScale(d.Region); })
+			.on("mouseover", function(d,i) {
+        		tooltip.style("opacity", 1)
+               .style("left",(d3.event.pageX)+"px")
+               .style("top",(d3.event.pageY)+"px")
+               .html("Country: " + d["Short Name"] 
+	      		+ "<br />" + "GDP Per Capita: " + d.GDPPerCapita
+	      		+ "<br />" + "Homicide Rate (per 100,000 people): " + d.Homicide
+	      		+ "<br />" + "Population: " + d.Population);
+    			})
+    		.on("mouseout", function() { tooltip.style("opacity", 0) });
 	}
 	//parseFloat(d.GDPPerCapita.replace(/,/g, ''));
 
 	//plot data for first year
-	var filteredData = getFilteredData(data,years[0]);
+	var filteredData = getFilteredData(data,selectedYear,getRegionsList());
 	plotGraph(scatterPlot,filteredData);
 
+	d3.selectAll("input")
+  		.on('change', function(i) {
+  			console.log(getRegionsList());
+    		plotGraph(scatterPlot,getFilteredData(data,selectedYear, getRegionsList()));
+		});
+	
 
 }
 </script>
