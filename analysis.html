@@ -6,12 +6,11 @@
 	.chart line { stroke-width: 1; stroke: lightgray; }
 	.chart circle {stroke: white; cursor: pointer;}
 	.chart circle:hover {stroke: black;}
-	.chart rect {cursor: pointer;fill:lightblue;stroke:black;}
+	.chart rect {cursor: pointer;stroke:black;}
 	#tooltip {
 	    opacity: 0;
 	    position: absolute;
 	    text-align: left;
-	    /*width: 60px; height: 40px;*/
 	    background: white;
 	    stroke: black;
 	    border: 5px solid black;
@@ -21,41 +20,27 @@
 </head>
 
 <body onload='init()'>
-		<h2> Choose one or more region </h2>
-		<div class="multiselect">
-			<input type="checkbox" id="Latin America & Caribbean" checked> Latin America & Caribbean
-			<input type="checkbox" id="South Asia" checked>South Asia
-			<input type="checkbox" id="Sub-Saharan Africa" checked>Sub-Saharan Africa
-			<input type="checkbox" id="Europe & Central Asia" checked>Europe & Central Asia
-			<input type="checkbox" id="Middle East & North Africa" checked>Middle East & North Africa
-			<input type="checkbox" id="East Asia & Pacific" checked>East Asia & Pacific
-			<input type="checkbox" id="North America" checked>North America
-		</div>
-		<svg class="chart" width=1200 height=610></svg>
-		<div class="status">Click on an year</div>
+		<h1>Is wealth making our societies safer?</h3>
+			<p> To answer this question we explore how for various countries number of homicides (a proxy for safety) evolved with Per Capita GDP in constant 2010$ terms (a proxy of wealth) using a scatter plot.</p>
+			<p> Data source is World Development Index parameters.</p>
+		<p> To see for yourself, you an choose one or more region and click through years to see how the countries in the chosen region has evolved. You can also hover over any of the circle to get more details about a specific country.</p>
+		<p> Note: Not all countries have homicide data for each year, hence they may appear or disappear as you run through years </p>
+		<h3>Select one or more regions:</h3>
+		<div class="multiselect"></div>
+		<h3>Click on the years to see the progress:</h3>
+		<svg class="chart" width=1200 height=800></svg>
 		<div id="tooltip"></div>
 
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script>
 function getFilteredData(data, year, region){
 		var filteredData = data.filter(function (el) {
-			return el.year == year && region.includes(el.Region); 
+			return el.year == year && region.includes(el.Region) && el.GDPPerCapita  && el.Homicide ; 
 		});
 		return filteredData;
 }
 
-async function init() {
-	const data = await d3.csv("https://raw.githubusercontent.com/kautukkhare/narrativeViz/master/GDPAndHomicideData.csv");
-
-	//var obj = {"Country Code":"ABW","Short Name":"Aruba","Region":"Latin America & Caribbean","year":"1995","GDPPerCapita":"26,705","GDPperCapitaPPP":"39,113","Homicide":"","HomicideFemale":"","Population":"80,324"};
-	
-	//get the years as an array
-	const years = [...new Set(data.map(eachData => eachData.year))]
-	const regions = [...new Set(data.map(eachData => eachData.Region))]
-
-	var selectedYear = years[0];
-
-	function getRegionsList() {
+function getRegionsList() {
 		var checkBoxList = document.getElementsByTagName("input");;
 		var regionList = [];
 		var i;
@@ -67,17 +52,32 @@ async function init() {
 		return regionList;
 	}
 
+async function init() {
+	const data = await d3.csv("https://raw.githubusercontent.com/kautukkhare/narrativeViz/master/GDPAndHomicideData.csv");
+	
+	//get the years as an array
+	const years = [...new Set(data.map(eachData => eachData.year))]
+
+	//get the regions as an array
+	const regions = [...new Set(data.map(eachData => eachData.Region))]
+
+
+	//Default to the first year available
+	var selectedYear = years[0];
+
+	//Get the regions selected
 	var regionList = getRegionsList();
-	console.log(regionList);
 
 	//Define Scales
-	var xlogScale = d3.scaleLinear()
-	.domain([150, 200000])
-	.range([0, 1100]);
+	var xlogScale = d3.scaleLog()
+	.domain([100, 200000])
+	.range([0, 1000])
+	.clamp(true);
 
-	var ylogScale = d3.scaleLinear()
-	.domain([0, 150])
-	.range([500, 0]);
+	var ylogScale = d3.scaleLog()
+	.domain([1, 100])
+	.range([600, 0])
+	.clamp(true);
 
 
     var rScale = d3.scaleLinear()
@@ -86,35 +86,37 @@ async function init() {
 
     var colorScale = d3.scaleOrdinal()
           .domain(regions)
-          .range(d3.schemeSet2);
+          .range(d3.schemeDark2);
 
+
+    //Define Rect size
 	var rectWidth = 50;
 	var rectHeight = 25;
 
-	//Add scatterplot element
-	scatterPlot = d3.select('svg')
-	.append("g")
-	.attr("id","plot")
-	.attr("transform", "translate(50,50)");
+	//Create checkboxes for regions
+	var regionInput = d3.select(".multiselect");
 
-
-	//Add Axes
-	d3.select("svg")
-	.append("g")
-	.attr("transform", "translate(50,50)")
-	.call(d3.axisLeft(ylogScale));
-
-	d3.select("svg")
-	.append("g")
-	.attr("transform", "translate(50,550)")
-	.call(d3.axisBottom(xlogScale));
-
+	regionInput.selectAll("Input")
+		.data(regions)
+		.enter()
+		.append("label")
+  		.text(function(d) { return "         "+d; })
+  		.style("color", function(d) { return colorScale(d); })
+    	.style("font-weight", "bold")
+    	.style("font-size", "15")
+  		.append("input")
+  		.attr("checked", true)
+  		.attr("type", "checkbox")
+  		.attr("id", function(d,i) { return d; })
+  		.on('change', function(i) {
+  			console.log(getRegionsList());
+    		plotGraph(scatterPlot,getFilteredData(data,selectedYear, getRegionsList()));
+		});
 
 	//Add Years control
-
 	var yearsBarSVG = d3.select("svg")
 	.append("g")
-	.attr("transform", "translate(50,575)");
+	.attr("transform", "translate(20,0)");
 
 	yearsBarSVG.selectAll('rect')
 	.data(years)
@@ -124,11 +126,10 @@ async function init() {
 	.attr('y',0)
 	.attr('width', rectWidth)
 	.attr('height',rectHeight)
-	//.attr('class', "yearsBar")
+	.attr('style',"fill:lightgray")
 	.on('click', function(d, i) {
 		selectedYear = d;
-		d3.select('.status')
-		.text('You clicked on year ' + d);
+		updateChosenYear();
 		plotGraph(scatterPlot,getFilteredData(data,d, getRegionsList()));
 	  });
 	
@@ -144,13 +145,70 @@ async function init() {
 	.text(function(d){return d})
 	.on('click', function(d, i) {
 		selectedYear = d;
-		d3.select('.status')
-		.text('You clicked on year ' + d);
+		updateChosenYear();
 		plotGraph(scatterPlot,getFilteredData(data,d, getRegionsList()));
 	  });
 
+
+	//Add scatterplot element
+	scatterPlot = d3.select('svg')
+	.append("g")
+	.attr("id","plot")
+	.attr("transform", "translate(70,50)");
+
+
+	//Add Axes
+	d3.select("svg")
+	.append("g")
+	.attr("transform", "translate(70,50)")
+	.call(d3.axisLeft(ylogScale)
+		.tickValues([1, 2, 3, 5, 10, 20, 50, 100])
+		.tickFormat(d3.format("~s")));
+
+	d3.select("svg")
+	.append("g")
+	.attr("transform", "translate(70,650)")
+	.call(d3.axisBottom(xlogScale)
+		.tickValues([100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 200000])
+		.tickFormat(d3.format("~s")));
+
+	//Add Axes labels
+	d3.select("svg")
+	.append("g")
+	.attr("transform", "translate(600,750)")
+	.append("text")             
+    .style("text-anchor", "middle")
+    .style("font-weight", "bold")
+    .text("GDP Per Capita in 2010$(Log Scale)");
+
+    d3.select("svg")
+	.append("g")
+	.attr("transform", "translate(35,350) rotate(-90)")
+	.append("text")             
+    .style("text-anchor", "middle")
+    .style("font-weight", "bold")
+    .text("Homicide Rate per 100,000 people (Log Scale)")
+
+
+    //Add Year Chosen
+	var yearChosen = d3.select("svg")
+	.append("g")
+	.attr("transform", "translate(160,70)")
+	.append("text")             
+    .style("font-weight", "bold")
+    .style("font-style", "italic")
+    .style("font-size", "20");
+
+    
+
 	// Adding Tooltip functions
 	var tooltip = d3.select("#tooltip");
+
+
+	//Define the function to update Chosen Year
+	function updateChosenYear() {
+    	yearChosen.text("Year Chosen: " + selectedYear);
+    }
 
 	//Define plotting function
 	function plotGraph(element, d){
@@ -174,19 +232,11 @@ async function init() {
     			})
     		.on("mouseout", function() { tooltip.style("opacity", 0) });
 	}
-	//parseFloat(d.GDPPerCapita.replace(/,/g, ''));
 
 	//plot data for first year
 	var filteredData = getFilteredData(data,selectedYear,getRegionsList());
 	plotGraph(scatterPlot,filteredData);
-
-	d3.selectAll("input")
-  		.on('change', function(i) {
-  			console.log(getRegionsList());
-    		plotGraph(scatterPlot,getFilteredData(data,selectedYear, getRegionsList()));
-		});
-	
-
+	updateChosenYear();
 }
 </script>
 </body>
